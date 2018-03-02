@@ -34,7 +34,7 @@ public class ServiceBrokerHelper {
 	ServiceBrokerHelper() {
 		Properties p = new Properties();
 		try {
-			p.load(getClass().getResourceAsStream("/resources/cfg.properties"));
+			p.load(getClass().getResourceAsStream("/cfg.properties"));
 			TCP_BROKER_URL = p.getProperty("broker.url");
 		} catch (IOException e) {
 			e.printStackTrace();
