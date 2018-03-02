@@ -14,7 +14,7 @@ public class LocalCommand extends BaseCommand {
 	private String currentDrive;
 
 	public LocalCommand() {
-		setCurrentFolder(System.getProperty("user.dir").toLowerCase());
+		setCurrentFolder(System.getProperty("user.dir"));
 	}
 
 	@Override
@@ -23,7 +23,7 @@ public class LocalCommand extends BaseCommand {
 	}
 
 	private void setCurrentFolder(String currentFolder) {
-		currentDrive = currentFolder.substring(0, 1);
+		currentDrive = currentFolder.substring(0, 1).toLowerCase();
 		paths.put(currentDrive, currentFolder);
 	}
 
@@ -32,26 +32,34 @@ public class LocalCommand extends BaseCommand {
 
 		try {
 			if (Optional.ofNullable(cmd).isPresent() && cmd.matches("[a-z]\\:")) {
-				cmd = "cd " + cmd;
+
+				String drive = cmd.substring(0, 1).toLowerCase();
+				if (paths.containsKey(drive)) {
+					currentDrive = drive;
+				} else if (new File(cmd).exists()) {
+					setCurrentFolder(new File(cmd).getAbsolutePath());
+				}
+				return;
 			}
 
 			if (Optional.ofNullable(cmd).isPresent() && (cmd.startsWith("cd.") || cmd.startsWith("cd "))) {
 
-				if (cmd.replaceAll("\\s", "").startsWith("cd.")) {
-					if (cmd.replaceAll("\\s", "").equals("cd..") && getCurrentFolder().indexOf(File.separator) != -1) {
+				if (cmd.replaceAll(" ", "").startsWith("cd.")) {
+					if (cmd.replaceAll(" ", "").equals("cd..") && getCurrentFolder().indexOf(File.separator) != -1) {
 						setCurrentFolder(
 								getCurrentFolder().substring(0, getCurrentFolder().lastIndexOf(File.separator)));
 					}
 				} else {
-					if (cmd.matches("cd\\s*[a-z]\\:.?")) {
-						if (new File(cmd.split("\\s")[1]).exists()) {
-							setCurrentFolder(cmd.split("\\s")[1]);
+					cmd = cmd.split(" ")[1];
+					if (cmd.matches("[a-z]\\:.*")) {
+						if (new File(cmd).exists()) {
+							setCurrentFolder(cmd);
 						} else {
 							System.out.println("The system cannot find the path specified.");
 						}
 					} else {
-						if (new File(getCurrentFolder() + File.separator + cmd.split("\\s")[1]).exists()) {
-							setCurrentFolder(getCurrentFolder() + File.separator + cmd.split("\\s")[1]);
+						if (new File(getCurrentFolder() + File.separator + cmd).exists()) {
+							setCurrentFolder(getCurrentFolder() + File.separator + cmd);
 						} else {
 							System.out.println("The system cannot find the path specified.");
 						}
@@ -61,7 +69,7 @@ public class LocalCommand extends BaseCommand {
 				return;
 			}
 
-			Process p = Runtime.getRuntime().exec("cmd /c " + cmd, null, new File(getCurrentFolder()));
+			Process p = Runtime.getRuntime().exec("cmd /c " + cmd, null, new File(getCurrentFolder() + File.separator));
 
 			// Get input streams
 			try (BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));

@@ -1,14 +1,10 @@
 package prompt;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import javax.jms.Connection;
 import javax.jms.DeliveryMode;
-import javax.jms.ExceptionListener;
 import javax.jms.JMSException;
 import javax.jms.MessageConsumer;
 import javax.jms.MessageProducer;
@@ -18,6 +14,7 @@ import javax.jms.TextMessage;
 
 import org.apache.activemq.ActiveMQConnectionFactory;
 import org.apache.activemq.broker.BrokerService;
+import org.apache.activemq.store.memory.MemoryPersistenceAdapter;
 
 public class RemoteCommandExecutor {
 
@@ -25,35 +22,37 @@ public class RemoteCommandExecutor {
 
 	static final String EXIT_CLIENT = "exitc";
 
-	public static final String RESULT = "RESULT";
+	static final String RESULT = "RESULT";
 
-	public static final String CURRENT_FOLDER = "CURRENT_FOLDER";
+	static final String COMMAND = "COMMAND";
 
-	public static final String COMMAND = "COMMAND";
+	static final String CURRENT_FOLDER = "cf=";
 
-	public static final String TCP_BROKER_URL = "tcp://localhost:61616";
+	//static final String TCP_BROKER_URL = "tcp://172.27.34.42:61616";
+	static final String TCP_BROKER_URL = "tcp://localhost:61616";
 
 	private static BrokerService broker;
 
 	private static Connection connection;
-
-	private static Map<String, MessageProducer> producers = new HashMap<>();
 
 	public static void start() {
 
 		// configure the broker
 		try {
 			broker = new BrokerService();
+			broker.setPersistenceAdapter(new MemoryPersistenceAdapter());
 			broker.addConnector(TCP_BROKER_URL);
 			broker.start();
 
 			RemoteCommandExecutor.waitFor(broker, p -> !p.isStarted());
 
 			connection = createConnection();
+			
+			connection.setExceptionListener(e -> {
+				System.out.println("JMS Exception occured.  Shutting down client.");
+			});
 
-			Session session = connection.createSession(true, Session.SESSION_TRANSACTED);
-
-			remote(session);
+			remote();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -65,68 +64,34 @@ public class RemoteCommandExecutor {
 		// Create a Connection
 		connection = connectionFactory.createConnection();
 
-		connection.setExceptionListener(new ExceptionListener() {
-
-			@Override
-			public void onException(JMSException exception) {
-				System.out.println("JMS Exception occured.  Shutting down client.");
-			}
-		});
-
 		connection.start();
 
 		return connection;
 	}
 
-	private static void remote(Session session) throws Exception {
+	private static void remote() throws Exception {
 
 		final LocalCommand command = new LocalCommand();
 
-		command.setResultConsumer(p -> sendMessage(session, p, RemoteCommandExecutor.RESULT));
+		command.setResultConsumer(p -> sendMessage(p, RemoteCommandExecutor.RESULT));
 
-		consumerListener(session, RemoteCommandExecutor.COMMAND, (cmd, commiter) -> {
-			try {
-				command.execute(cmd);
-				sendMessage(session, command.getCurrentFolder(), RemoteCommandExecutor.CURRENT_FOLDER);
-				commiter.commit(session);
-				checkForExit(session, cmd);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+		consumerListener(RemoteCommandExecutor.COMMAND, cmd -> {
+			command.execute(cmd);
+			sendMessage(RemoteCommandExecutor.CURRENT_FOLDER+command.getCurrentFolder(), RemoteCommandExecutor.RESULT);
+			checkForExit(cmd);
 		});
 	}
-	
-	static class SessionCommiter {
-		
-		boolean commited = false;
-		
-		void commit(Session session) {
-			if (commited) return;
-			try {
-				session.commit();
-				commited = true;
-			} catch (JMSException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-	
-	public static void consumerListener(Session session, String queue, Consumer<String> consumer) throws JMSException {
-		consumerListener(session, queue, (p, c) -> consumer.accept(p));
-	}
-	
 
-	public static void consumerListener(Session session, String queue, BiConsumer<String, SessionCommiter> consumer) throws JMSException {
+	public static void consumerListener(String queue, Consumer<String> consumer) throws JMSException {
+
+		Session session = createSession();
 
 		MessageConsumer mc = RemoteCommandExecutor.createMessageConsumer(session, queue);
-		
-		SessionCommiter commiter = new SessionCommiter();
 
 		mc.setMessageListener(message -> {
 			TextMessage textMessage = (TextMessage) message;
 			try {
-				consumer.accept(textMessage.getText(), commiter);
-				commiter.commit(session);
+				consumer.accept(textMessage.getText());
 			} catch (JMSException e) {
 				e.printStackTrace();
 			}
@@ -135,18 +100,22 @@ public class RemoteCommandExecutor {
 	}
 
 	public static MessageConsumer createMessageConsumer(Session session, String queue) throws JMSException {
+
 		Queue target = session.createQueue(queue);
 
 		return session.createConsumer(target);
 	}
 
-	private static void checkForExit(Session session, String cmd) throws JMSException, InterruptedException, Exception {
+	private static void checkForExit(String cmd) {
 		if (cmd.equals(RemoteCommandExecutor.EXIT)) {
-			waitFor(broker, p -> p.getCurrentConnections() > 1);
-			session.close();
-			connection.close();
-			waitFor(broker, p -> p.getCurrentConnections() > 0);
-			broker.stop();
+			try {
+				waitFor(broker, p -> p.getCurrentConnections() > 1);
+				connection.close();
+				waitFor(broker, p -> p.getCurrentConnections() > 0);
+				broker.stop();
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 	}
 
@@ -156,25 +125,25 @@ public class RemoteCommandExecutor {
 		}
 	}
 
-	public static void sendMessage(Session session, String message, String queue) {
+	public static void sendMessage(String message, String queue) {
 		try {
+			Session session = createSession();
 			MessageProducer producer;
-			if (producers.containsKey(queue)) {
-				producer = producers.get(queue);
-			} else {
-				Queue destination = session.createQueue(queue);
-				producer = session.createProducer(destination);
-				producer.setDeliveryMode(DeliveryMode.PERSISTENT);
-				producers.put(queue, producer);
-			}
+			Queue destination = session.createQueue(queue);
+			producer = session.createProducer(destination);
+			producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
 			TextMessage textMessage = session.createTextMessage(message);
 			producer.send(textMessage);
 
-			session.commit();
+			session.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private static Session createSession() throws JMSException {
+		return connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 	}
 
 }

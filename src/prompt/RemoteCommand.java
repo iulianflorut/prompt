@@ -2,13 +2,10 @@ package prompt;
 
 import javax.jms.Connection;
 import javax.jms.JMSException;
-import javax.jms.Session;
 
 public class RemoteCommand extends BaseCommand {
 
-	private String currentFolder = System.getProperty("user.dir").toLowerCase();
-
-	private Session session;
+	private String currentFolder;
 
 	private Connection connection;
 
@@ -17,8 +14,13 @@ public class RemoteCommand extends BaseCommand {
 	public RemoteCommand() {
 		try {
 			connection = RemoteCommandExecutor.createConnection();
-			session = connection.createSession(true, Session.SESSION_TRANSACTED);
-			receiveCurrentFolder();
+			connection.setExceptionListener(e -> {
+				synchronized (sync) {
+					sync.notifyAll();
+				}
+				System.out.println("JMS Exception occured.  Shutting down client.");
+			});
+
 			receiveResult();
 			execute("");
 		} catch (Exception e) {
@@ -40,9 +42,8 @@ public class RemoteCommand extends BaseCommand {
 				return;
 			}
 
-			RemoteCommandExecutor.sendMessage(session, cmd, RemoteCommandExecutor.COMMAND);
-
 			synchronized (sync) {
+				RemoteCommandExecutor.sendMessage(cmd, RemoteCommandExecutor.COMMAND);
 				sync.wait();
 			}
 
@@ -56,22 +57,19 @@ public class RemoteCommand extends BaseCommand {
 	}
 
 	private void exit() throws JMSException {
-		session.close();
 		connection.close();
 	}
 
 	private void receiveResult() throws JMSException {
-		RemoteCommandExecutor.consumerListener(session, RemoteCommandExecutor.RESULT, resultConsumer);
-	}
-
-	private void receiveCurrentFolder() throws JMSException {
-		RemoteCommandExecutor.consumerListener(session, RemoteCommandExecutor.CURRENT_FOLDER, (p, commiter) -> {
-			currentFolder = p;
-			commiter.commit(session);
-			synchronized (sync) {
-				sync.notify();
+		RemoteCommandExecutor.consumerListener(RemoteCommandExecutor.RESULT, p -> {
+			if (p.startsWith(RemoteCommandExecutor.CURRENT_FOLDER)) {
+				this.currentFolder = p.substring(RemoteCommandExecutor.CURRENT_FOLDER.length(), p.length());
+				synchronized (sync) {
+					sync.notifyAll();
+				}
+			} else {
+				resultConsumer.accept(p);
 			}
 		});
-
 	}
 }

@@ -13,7 +13,7 @@ public enum Environment {
 	}
 
 	public Commandable getCommand() {
-		if (command == null) {
+		if (!isInstantiated()) {
 			try {
 				this.command = clazz.newInstance();
 			} catch (InstantiationException | IllegalAccessException e) {
@@ -21,6 +21,10 @@ public enum Environment {
 			}
 		}
 		return command;
+	}
+
+	public boolean isInstantiated() {
+		return command != null;
 	}
 
 	public String shortName() {
