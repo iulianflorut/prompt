@@ -8,12 +8,14 @@ public class RemoteCommand extends BaseCommand {
 	private String currentFolder;
 
 	private Connection connection;
+	
+	ServiceBrokerHelper servivceBrokerHelper = new ServiceBrokerHelper();
 
 	private Object sync = new Object();
 
 	public RemoteCommand() {
 		try {
-			connection = RemoteCommandExecutor.createConnection();
+			connection = servivceBrokerHelper.createConnection();
 			connection.setExceptionListener(e -> {
 				synchronized (sync) {
 					sync.notifyAll();
@@ -37,17 +39,17 @@ public class RemoteCommand extends BaseCommand {
 	public void execute(String cmd) {
 
 		try {
-			if (cmd.equals(RemoteCommandExecutor.EXIT_CLIENT)) {
+			if (cmd.equals(ServiceBrokerHelper.EXIT_CLIENT)) {
 				exit();
 				return;
 			}
 
 			synchronized (sync) {
-				RemoteCommandExecutor.sendMessage(cmd, RemoteCommandExecutor.COMMAND);
+				servivceBrokerHelper.sendMessage(connection, cmd, ServiceBrokerHelper.COMMAND);
 				sync.wait();
 			}
 
-			if (cmd.equals(RemoteCommandExecutor.EXIT)) {
+			if (cmd.equals(ServiceBrokerHelper.EXIT)) {
 				exit();
 				return;
 			}
@@ -61,9 +63,9 @@ public class RemoteCommand extends BaseCommand {
 	}
 
 	private void receiveResult() throws JMSException {
-		RemoteCommandExecutor.consumerListener(RemoteCommandExecutor.RESULT, p -> {
-			if (p.startsWith(RemoteCommandExecutor.CURRENT_FOLDER)) {
-				this.currentFolder = p.substring(RemoteCommandExecutor.CURRENT_FOLDER.length(), p.length());
+		servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.RESULT, ServiceBrokerHelper.CURRENT_FOLDER, (p, hasProperty) -> {
+			if (hasProperty) {
+				this.currentFolder = p;
 				synchronized (sync) {
 					sync.notifyAll();
 				}

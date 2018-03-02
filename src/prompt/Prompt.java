@@ -19,7 +19,7 @@ public class Prompt {
 	public static void main(String[] args) throws Exception {
 
 		if (args.length > 0 && args[0].equals("remote")) {
-			RemoteCommandExecutor.start();
+			new RemoteCommandListener().start();
 		} else {
 			Environment env = Environment.local;
 
@@ -76,7 +76,7 @@ public class Prompt {
 	}
 
 	private static boolean exit(final String cmd) {
-		boolean exit = Stream.of(RemoteCommandExecutor.EXIT, RemoteCommandExecutor.EXIT_CLIENT)
+		boolean exit = Stream.of(ServiceBrokerHelper.EXIT, ServiceBrokerHelper.EXIT_CLIENT)
 				.filter(p -> p.equals(cmd)).findFirst().isPresent();
 		
 		if (exit && Environment.remote.isInstantiated()) {
