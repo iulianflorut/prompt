@@ -18,7 +18,7 @@ public class Prompt {
 
 	public static void main(String[] args) throws Exception {
 
-		if (args.length > 0 && args[0].equals("remote")) {
+		if (args.length > 0 && args[0].equals(Environment.remote.name())) {
 			new RemoteCommandListener().start();
 		} else {
 			Environment env = Environment.local;

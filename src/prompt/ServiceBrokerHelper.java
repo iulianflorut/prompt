@@ -2,6 +2,7 @@ package prompt;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -25,9 +26,28 @@ public class ServiceBrokerHelper {
 	static final String EXIT_CLIENT = "exitc";
 	static final String RESULT = "RESULT";
 	static final String COMMAND = "COMMAND";
-	static final String CURRENT_FOLDER = "cf=";
+	static final String CURRENT_FOLDER = "current_folder";
 	// static final String TCP_BROKER_URL = "tcp://172.27.34.42:61616";
-	static final String TCP_BROKER_URL = "tcp://localhost:61616";
+	static String TCP_BROKER_URL;
+	
+	
+	ServiceBrokerHelper() {
+		Properties p = new Properties();
+		try {
+			p.load(getClass().getResourceAsStream("/resources/cfg.properties"));
+			TCP_BROKER_URL = p.getProperty("broker.url");
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	BrokerService createBroker() throws IOException, Exception {
+		BrokerService broker = new BrokerService();
+		broker.setPersistenceAdapter(new MemoryPersistenceAdapter());
+		broker.addConnector(ServiceBrokerHelper.TCP_BROKER_URL);
+		broker.start();
+		return broker;
+	}
 
 	Connection createConnection() throws JMSException {
 		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(ServiceBrokerHelper.TCP_BROKER_URL);
@@ -51,7 +71,7 @@ public class ServiceBrokerHelper {
 			TextMessage textMessage = (TextMessage) message;
 			try {
 				Boolean hasProperty = Optional.ofNullable(property).isPresent()
-						&& Optional.ofNullable(textMessage.getBooleanProperty(property)).isPresent();
+						&& Optional.ofNullable(textMessage.getBooleanProperty(property)).orElse(false);
 				consumer.accept(textMessage.getText(), hasProperty);
 			} catch (JMSException e) {
 				e.printStackTrace();
@@ -109,13 +129,5 @@ public class ServiceBrokerHelper {
 
 	Session createSession(Connection connection) throws JMSException {
 		return connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-	}
-
-	BrokerService createBroker() throws IOException, Exception {
-		BrokerService broker = new BrokerService();
-		broker.setPersistenceAdapter(new MemoryPersistenceAdapter());
-		broker.addConnector(ServiceBrokerHelper.TCP_BROKER_URL);
-		broker.start();
-		return broker;
 	}
 }
