@@ -62,6 +62,8 @@ public class Prompt {
 
 						writer.println(cmd);
 						writer.println();
+						writer.flush();
+						
 
 						if (exit(cmd)) {
 							break;

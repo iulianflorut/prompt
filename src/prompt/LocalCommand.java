@@ -2,6 +2,8 @@ package prompt;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
@@ -71,25 +73,37 @@ public class LocalCommand extends BaseCommand {
 
 			Process p = Runtime.getRuntime().exec("cmd /c " + cmd, null, new File(getCurrentFolder() + File.separator));
 
-			// Get input streams
-			try (BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-					BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+			Thread t1 = writeOutput(p.getErrorStream());
 
-				// Read command standard output
-				Optional<String> s;
-				while ((s = Optional.ofNullable(stdInput.readLine())).isPresent()) {
-					resultConsumer.accept(s.get());
-				}
-
-				// Read command errors
-				while ((s = Optional.ofNullable(stdError.readLine())).isPresent()) {
-					resultConsumer.accept(s.get());
-				}
-			}
+			Thread t2 = writeOutput(p.getInputStream());
 
 			p.waitFor();
+
+			t1.join();
+			t2.join();
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
+
+	private Thread writeOutput(InputStream in) {
+
+		Runnable r = () -> {
+			try (BufferedReader buffer = new BufferedReader(new InputStreamReader(in))) {
+
+				buffer.lines().forEach(resultConsumer);
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		};
+
+		Thread t = new Thread(r);
+
+		t.start();
+
+		return t;
+	}
+
 }
