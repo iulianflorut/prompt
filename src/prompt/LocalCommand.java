@@ -2,108 +2,95 @@ package prompt;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class LocalCommand extends BaseCommand {
 
-	private Map<String, String> paths = new HashMap<>();
+	private Map<String, File> paths = new HashMap<>();
 
-	private String currentDrive;
+	private String root;
+
+	private final Pattern cdPattern = Pattern.compile("^((?i)cd|chdir)(\\.\\.| .*)$");
+	
+	private final Pattern rootPattern = Pattern.compile("^([A-Za-z]\\:)$");
 
 	public LocalCommand() {
-		setCurrentFolder(System.getProperty("user.dir"));
+		changeRoot(System.getProperty("user.dir"));
 	}
 
 	@Override
-	public String getCurrentFolder() {
-		return paths.get(currentDrive);
+	public File getDefaultFolder() {
+		return paths.get(root);
 	}
 
-	private void setCurrentFolder(String currentFolder) {
-		currentDrive = currentFolder.substring(0, 1).toLowerCase();
-		paths.put(currentDrive, currentFolder);
+	private void changeRoot(final String root) {
+		File file = new File(root);
+		if (file.exists()) {
+			this.root = getFileRoot(file);
+			if (!paths.containsKey(this.root)) {
+				setDefaultFolder(file);
+			}
+		} else {
+			System.err.println("The system cannot find the drive specified.");
+		}
+	}
+
+	private String getFileRoot(final File file) {
+		return Paths.get(file.toURI()).getRoot().toString().toLowerCase();
+	}
+
+	private void setDefaultFolder(final String path) {
+		File file = new File(path);
+		if (file.exists()) {
+			setDefaultFolder(file);
+		} else {
+			System.err.println("The system cannot find the path specified.");
+		}
+	}
+
+	private void setDefaultFolder(final File file) {
+		paths.put(getFileRoot(file), file);
 	}
 
 	@Override
-	public void execute(String cmd) {
+	public void execute(final String cmd) {
 
 		try {
-			if (Optional.ofNullable(cmd).isPresent() && cmd.matches("[a-z]\\:")) {
+			if (!Optional.ofNullable(cmd).isPresent() || cmd.isEmpty())
+				return;
 
-				String drive = cmd.substring(0, 1).toLowerCase();
-				if (paths.containsKey(drive)) {
-					currentDrive = drive;
-				} else if (new File(cmd).exists()) {
-					setCurrentFolder(new File(cmd).getAbsolutePath());
-				}
+			final Optional<String> root = Optional.of(rootPattern.matcher(cmd)).filter(Matcher::find).map(m -> m.group(1));
+
+			if (root.isPresent()) {
+				changeRoot(root.get());
 				return;
 			}
 
-			if (Optional.ofNullable(cmd).isPresent() && (cmd.startsWith("cd.") || cmd.startsWith("cd "))) {
+			final Optional<String> path = Optional.of(cdPattern.matcher(cmd)).filter(Matcher::find).map(m->m.group(2).trim())
+					.map(m -> Paths.get(getDefaultFolder().toURI()).resolve(m).normalize().toString());
 
-				if (cmd.replaceAll(" ", "").startsWith("cd.")) {
-					if (cmd.replaceAll(" ", "").equals("cd..") && getCurrentFolder().indexOf(File.separator) != -1) {
-						setCurrentFolder(
-								getCurrentFolder().substring(0, getCurrentFolder().lastIndexOf(File.separator)));
-					}
-				} else {
-					cmd = cmd.split(" ")[1];
-					if (cmd.matches("[a-z]\\:.*")) {
-						if (new File(cmd).exists()) {
-							setCurrentFolder(cmd);
-						} else {
-							System.out.println("The system cannot find the path specified.");
-						}
-					} else {
-						if (new File(getCurrentFolder() + File.separator + cmd).exists()) {
-							setCurrentFolder(getCurrentFolder() + File.separator + cmd);
-						} else {
-							System.out.println("The system cannot find the path specified.");
-						}
-					}
-				}
-
+			if (path.isPresent()) {
+				setDefaultFolder(path.get());
 				return;
 			}
 
-			Process p = Runtime.getRuntime().exec("cmd /c " + cmd, null, new File(getCurrentFolder() + File.separator));
+			final Process p = new ProcessBuilder("cmd", "/c", cmd)
+					.directory(getDefaultFolder()).redirectErrorStream(true).start();
 
-			Thread t1 = writeOutput(p.getErrorStream());
-
-			Thread t2 = writeOutput(p.getInputStream());
+			try (final BufferedReader buffer = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+				buffer.lines().forEach(resultConsumer);
+			}
 
 			p.waitFor();
-
-			t1.join();
-			t2.join();
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-
-	private Thread writeOutput(InputStream in) {
-
-		Runnable r = () -> {
-			try (BufferedReader buffer = new BufferedReader(new InputStreamReader(in))) {
-
-				buffer.lines().forEach(resultConsumer);
-
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		};
-
-		Thread t = new Thread(r);
-
-		t.start();
-
-		return t;
-	}
-
 }

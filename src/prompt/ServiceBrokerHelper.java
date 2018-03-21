@@ -22,12 +22,11 @@ import org.apache.activemq.store.memory.MemoryPersistenceAdapter;
 
 public class ServiceBrokerHelper {
 
+	static final String KILL = "kill";
 	static final String EXIT = "exit";
-	static final String EXIT_CLIENT = "exitc";
 	static final String RESULT = "RESULT";
 	static final String COMMAND = "COMMAND";
-	static final String CURRENT_FOLDER = "current_folder";
-	// static final String TCP_BROKER_URL = "tcp://172.27.34.42:61616";
+	static final String DEFAULT_FOLDER = "dir";
 	static String TCP_BROKER_URL;
 	
 	
@@ -35,7 +34,7 @@ public class ServiceBrokerHelper {
 		Properties p = new Properties();
 		try {
 			p.load(getClass().getResourceAsStream("/cfg.properties"));
-			TCP_BROKER_URL = p.getProperty("broker.url");
+			TCP_BROKER_URL = p.getProperty("broker.url", "tcp://localhost:61616");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

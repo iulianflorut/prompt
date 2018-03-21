@@ -6,21 +6,19 @@ import org.apache.activemq.broker.BrokerService;
 
 public class RemoteCommandListener {
 
-	ServiceBrokerHelper servivceBrokerHelper = new ServiceBrokerHelper();
+	private final ServiceBrokerHelper servivceBrokerHelper = new ServiceBrokerHelper();
 
 	public void start() {
 
 		try {
 			// configure the broker
-			BrokerService broker = servivceBrokerHelper.createBroker();
+			final BrokerService broker = servivceBrokerHelper.createBroker();
 
 			servivceBrokerHelper.waitFor(broker, p -> !p.isStarted());
 
-			Connection connection = servivceBrokerHelper.createConnection();
+			final Connection connection = servivceBrokerHelper.createConnection();
 
-			connection.setExceptionListener(e -> {
-				System.out.println("JMS Exception occured.  Shutting down client.");
-			});
+			connection.setExceptionListener(e -> System.err.println("JMS Exception occured. Shutting down client."));
 
 			final LocalCommand command = new LocalCommand();
 
@@ -28,8 +26,8 @@ public class RemoteCommandListener {
 
 			servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.COMMAND, cmd -> {
 				command.execute(cmd);
-				servivceBrokerHelper.sendMessage(connection,
-						command.getCurrentFolder(), ServiceBrokerHelper.RESULT, ServiceBrokerHelper.CURRENT_FOLDER);
+				servivceBrokerHelper.sendMessage(connection, command.getDefaultFolder().getAbsolutePath(), ServiceBrokerHelper.RESULT,
+						ServiceBrokerHelper.DEFAULT_FOLDER);
 				checkForExit(broker, connection, cmd);
 			});
 
@@ -38,8 +36,8 @@ public class RemoteCommandListener {
 		}
 	}
 
-	private void checkForExit(BrokerService broker, Connection connection, String cmd) {
-		if (cmd.equals(ServiceBrokerHelper.EXIT)) {
+	private void checkForExit(final BrokerService broker, final Connection connection, final String cmd) {
+		if (cmd.equals(ServiceBrokerHelper.KILL)) {
 			try {
 				servivceBrokerHelper.waitFor(broker, p -> p.getCurrentConnections() > 1);
 				connection.close();

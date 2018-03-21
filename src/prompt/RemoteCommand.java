@@ -1,17 +1,19 @@
 package prompt;
 
+import java.io.File;
+
 import javax.jms.Connection;
 import javax.jms.JMSException;
 
 public class RemoteCommand extends BaseCommand {
 
-	private String currentFolder;
+	private File defaultFolder;
 
 	private Connection connection;
 	
-	ServiceBrokerHelper servivceBrokerHelper = new ServiceBrokerHelper();
+	private final ServiceBrokerHelper servivceBrokerHelper = new ServiceBrokerHelper();
 
-	private Object sync = new Object();
+	private final Object sync = new Object();
 
 	public RemoteCommand() {
 		try {
@@ -20,7 +22,7 @@ public class RemoteCommand extends BaseCommand {
 				synchronized (sync) {
 					sync.notifyAll();
 				}
-				System.out.println("JMS Exception occured.  Shutting down client.");
+				System.err.println("JMS Exception occured. Shutting down client.");
 			});
 
 			receiveResult();
@@ -31,15 +33,15 @@ public class RemoteCommand extends BaseCommand {
 	}
 
 	@Override
-	public String getCurrentFolder() {
-		return currentFolder;
+	public File getDefaultFolder() {
+		return defaultFolder;
 	}
 
 	@Override
-	public void execute(String cmd) {
+	public void execute(final String cmd) {
 
 		try {
-			if (cmd.equals(ServiceBrokerHelper.EXIT_CLIENT)) {
+			if (cmd.equals(ServiceBrokerHelper.EXIT)) {
 				exit();
 				return;
 			}
@@ -49,7 +51,7 @@ public class RemoteCommand extends BaseCommand {
 				sync.wait();
 			}
 
-			if (cmd.equals(ServiceBrokerHelper.EXIT)) {
+			if (cmd.equals(ServiceBrokerHelper.KILL)) {
 				exit();
 				return;
 			}
@@ -59,13 +61,14 @@ public class RemoteCommand extends BaseCommand {
 	}
 
 	private void exit() throws JMSException {
+		alive = false;
 		connection.close();
 	}
 
 	private void receiveResult() throws JMSException {
-		servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.RESULT, ServiceBrokerHelper.CURRENT_FOLDER, (p, hasProperty) -> {
+		servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.RESULT, ServiceBrokerHelper.DEFAULT_FOLDER, (p, hasProperty) -> {
 			if (hasProperty) {
-				this.currentFolder = p;
+				this.defaultFolder = new File(p);
 				synchronized (sync) {
 					sync.notifyAll();
 				}

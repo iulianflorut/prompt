@@ -1,12 +1,15 @@
 package prompt;
 
+import java.io.File;
 import java.util.function.Consumer;
 
 public interface Commandable {
 
-	String getCurrentFolder();
+	File getDefaultFolder();
 
-	void execute(String cmd);
+	void execute(final String cmd);
 
-	void setResultConsumer(Consumer<String> c);
+	void setResultConsumer(final Consumer<String> c);
+	
+	 boolean isAlive();
 }
