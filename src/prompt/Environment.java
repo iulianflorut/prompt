@@ -38,14 +38,17 @@ public enum Environment {
 	}
 
 	public static boolean exit(String cmd) {
-		boolean exit = Stream.of(ServiceBrokerHelper.KILL, ServiceBrokerHelper.EXIT).filter(p -> p.equals(cmd))
-				.findFirst().isPresent();
-
-		if (exit && Environment.remote.isInstantiated() && Environment.remote.getCommand().isAlive()) {
-			Environment.remote.getCommand().execute(cmd);
+		
+		switch (cmd) {
+		case ServiceBrokerHelper.EXIT:
+			Stream.of(Environment.values()).filter(e->e.isInstantiated() && e.getCommand().isAlive()).forEach(e->e.getCommand().exit());
+			return true;
+		case ServiceBrokerHelper.KILL:
+			Stream.of(Environment.values()).filter(e->e.isInstantiated() && e.getCommand().isAlive()).forEach(e->e.getCommand().kill());
+			return true;
+		default:
+			return false;
 		}
-
-		return exit;
 	}
 
 }

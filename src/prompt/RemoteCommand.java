@@ -10,7 +10,7 @@ public class RemoteCommand extends BaseCommand {
 	private File defaultFolder;
 
 	private Connection connection;
-	
+
 	private final ServiceBrokerHelper servivceBrokerHelper = new ServiceBrokerHelper();
 
 	private final Object sync = new Object();
@@ -39,42 +39,41 @@ public class RemoteCommand extends BaseCommand {
 
 	@Override
 	public void execute(final String cmd) {
-
 		try {
-			if (cmd.equals(ServiceBrokerHelper.EXIT)) {
-				exit();
-				return;
-			}
-
 			synchronized (sync) {
 				servivceBrokerHelper.sendMessage(connection, cmd, ServiceBrokerHelper.COMMAND);
 				sync.wait();
-			}
-
-			if (cmd.equals(ServiceBrokerHelper.KILL)) {
-				exit();
-				return;
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
-	private void exit() throws JMSException {
-		alive = false;
-		connection.close();
+	public void exit() {
+		try {
+			super.exit();
+			connection.close();
+		} catch (JMSException e) {
+			e.printStackTrace();
+		}
+	}
+
+	public void kill() {
+		servivceBrokerHelper.sendMessage(connection, ServiceBrokerHelper.KILL, ServiceBrokerHelper.KILL);
+		super.kill();
 	}
 
 	private void receiveResult() throws JMSException {
-		servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.RESULT, ServiceBrokerHelper.DEFAULT_FOLDER, (p, hasProperty) -> {
-			if (hasProperty) {
-				this.defaultFolder = new File(p);
-				synchronized (sync) {
-					sync.notifyAll();
-				}
-			} else {
-				resultConsumer.accept(p);
-			}
-		});
+		servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.RESULT,
+				ServiceBrokerHelper.DEFAULT_FOLDER, (p, hasProperty) -> {
+					if (hasProperty) {
+						this.defaultFolder = new File(p);
+						synchronized (sync) {
+							sync.notifyAll();
+						}
+					} else {
+						resultConsumer.accept(p);
+					}
+				});
 	}
 }

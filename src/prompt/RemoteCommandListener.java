@@ -26,9 +26,12 @@ public class RemoteCommandListener {
 
 			servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.COMMAND, cmd -> {
 				command.execute(cmd);
-				servivceBrokerHelper.sendMessage(connection, command.getDefaultFolder().getAbsolutePath(), ServiceBrokerHelper.RESULT,
-						ServiceBrokerHelper.DEFAULT_FOLDER);
-				checkForExit(broker, connection, cmd);
+				servivceBrokerHelper.sendMessage(connection, command.getDefaultFolder().getAbsolutePath(),
+						ServiceBrokerHelper.RESULT, ServiceBrokerHelper.DEFAULT_FOLDER);
+			});
+
+			servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.KILL, cmd -> {
+				kill(broker, connection);
 			});
 
 		} catch (Exception e) {
@@ -36,16 +39,14 @@ public class RemoteCommandListener {
 		}
 	}
 
-	private void checkForExit(final BrokerService broker, final Connection connection, final String cmd) {
-		if (cmd.equals(ServiceBrokerHelper.KILL)) {
-			try {
-				servivceBrokerHelper.waitFor(broker, p -> p.getCurrentConnections() > 1);
-				connection.close();
-				servivceBrokerHelper.waitFor(broker, p -> p.getCurrentConnections() > 0);
-				broker.stop();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+	private void kill(final BrokerService broker, final Connection connection) {
+		try {
+			servivceBrokerHelper.waitFor(broker, p -> p.getCurrentConnections() > 1);
+			connection.close();
+			servivceBrokerHelper.waitFor(broker, p -> p.getCurrentConnections() > 0);
+			broker.stop();
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 

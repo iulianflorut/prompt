@@ -21,4 +21,12 @@ public abstract class BaseCommand implements Commandable {
 		return alive;
 	}
 	
+	public void exit() {
+		alive = false;
+	}
+	
+	public void kill() {
+		exit();
+	}
+	
 }

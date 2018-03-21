@@ -10,6 +10,10 @@ public interface Commandable {
 	void execute(final String cmd);
 
 	void setResultConsumer(final Consumer<String> c);
-	
-	 boolean isAlive();
+
+	boolean isAlive();
+
+	void exit();
+
+	void kill();
 }
