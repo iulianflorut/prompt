@@ -52,7 +52,6 @@ public class Prompt {
 			Environment env = Environment.local;
 
 			do {
-				
 				env.writePrompt();
 
 				final String line = br.readLine();
@@ -75,11 +74,11 @@ public class Prompt {
 
 				 Optional<Environment> openv = Stream.of(Environment.values()).filter(p -> p.name().equals(cmd)).findFirst();
 				 if (openv.isPresent()) {
-					 env = openv.get();
+					 env = Environment.get(openv.get());
 					 continue;
 				 }
 
-				env.getCommand().execute(cmd);
+				env.execute(cmd);
 
 			} while (true);
 		}

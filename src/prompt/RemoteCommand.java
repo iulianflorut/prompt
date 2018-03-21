@@ -7,7 +7,7 @@ import javax.jms.JMSException;
 
 public class RemoteCommand extends BaseCommand {
 
-	private File defaultFolder;
+	private File defaultFolder = new File(System.getProperty("user.dir"));
 
 	private Connection connection;
 
@@ -28,7 +28,7 @@ public class RemoteCommand extends BaseCommand {
 			receiveResult();
 			execute("");
 		} catch (Exception e) {
-			e.printStackTrace();
+			throw new RuntimeException(e);
 		}
 	}
 
