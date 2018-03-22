@@ -58,7 +58,7 @@ public class RemoteCommand extends BaseCommand {
 	}
 
 	public void kill() {
-		servivceBrokerHelper.sendMessage(connection, ServiceBrokerHelper.KILL, ServiceBrokerHelper.KILL);
+		servivceBrokerHelper.sendMessage(connection, "", ServiceBrokerHelper.KILL);
 		super.kill();
 	}
 

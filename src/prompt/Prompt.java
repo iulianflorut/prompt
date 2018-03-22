@@ -38,8 +38,8 @@ public class Prompt {
 			}
 
 			if (!exit) {
-				try (PrintWriter writer = new PrintWriter("cmd_" + System.currentTimeMillis() + ".log", "UTF-8")) {
-					run(System.in, writer::println);
+				try (PrintWriter out = new PrintWriter("cmd_" + System.currentTimeMillis() + ".log", "UTF-8")) {
+					run(System.in, out::println);
 				}
 			}
 		}

@@ -1,6 +1,8 @@
 package prompt;
 
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Consumer;
@@ -32,11 +34,18 @@ public class ServiceBrokerHelper {
 	ServiceBrokerHelper() {
 		Properties p = new Properties();
 		try {
-			p.load(getClass().getResourceAsStream("/cfg.properties"));
-			TCP_BROKER_URL = p.getProperty("broker.url", "tcp://localhost:61616");
+			Optional.of((InputStream) new FileInputStream("cfg.properties")).ifPresent(t -> {
+				try {
+					p.load(t);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			});
+
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		TCP_BROKER_URL = p.getProperty("broker.url", "tcp://localhost:61616");
 	}
 
 	BrokerService createBroker() throws IOException, Exception {
@@ -50,7 +59,6 @@ public class ServiceBrokerHelper {
 	Connection createConnection(ExceptionListener listener) throws JMSException {
 		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(ServiceBrokerHelper.TCP_BROKER_URL);
 
-		// Create a Connection
 		Connection connection = connectionFactory.createConnection();
 
 		connection.setExceptionListener(listener);
@@ -59,7 +67,7 @@ public class ServiceBrokerHelper {
 
 		return connection;
 	}
-	
+
 	void consumerListener(Connection connection, String queue, Consumer<String> consumer) throws JMSException {
 		consumerListener(connection, queue, consumer, Optional.empty());
 	}
@@ -74,8 +82,9 @@ public class ServiceBrokerHelper {
 		mc.setMessageListener(message -> {
 			TextMessage textMessage = (TextMessage) message;
 			try {
-				
-				if (propertyConsumer.isPresent() && Optional.ofNullable(textMessage.getBooleanProperty(propertyConsumer.get().property)).orElse(false)) {
+
+				if (propertyConsumer.isPresent() && Optional
+						.ofNullable(textMessage.getBooleanProperty(propertyConsumer.get().property)).orElse(false)) {
 					propertyConsumer.get().consumer.accept(textMessage.getText());
 				} else {
 					consumer.accept(textMessage.getText());
@@ -128,8 +137,7 @@ public class ServiceBrokerHelper {
 	void sendMessage(Connection connection, String message, String queue) {
 		sendMessage(connection, message, queue, Optional.empty());
 	}
-	
-	
+
 	Session createSession(Connection connection) throws JMSException {
 		return connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 	}
