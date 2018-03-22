@@ -17,7 +17,7 @@ public class LocalCommand extends BaseCommand {
 	private String root;
 
 	private final Pattern cdPattern = Pattern.compile("^((?i)cd|chdir)(\\.\\.| .*)$");
-	
+
 	private final Pattern rootPattern = Pattern.compile("^([A-Za-z]\\:)$");
 
 	public LocalCommand() {
@@ -61,36 +61,34 @@ public class LocalCommand extends BaseCommand {
 	@Override
 	public void execute(final String cmd) {
 
-		try {
-			if (!Optional.ofNullable(cmd).isPresent() || cmd.isEmpty())
-				return;
+		if (!Optional.ofNullable(cmd).isPresent() || cmd.isEmpty())
+			return;
 
-			final Optional<String> root = Optional.of(rootPattern.matcher(cmd)).filter(Matcher::find).map(m -> m.group(1));
+		final Optional<String> root = Optional.of(rootPattern.matcher(cmd)).filter(Matcher::find).map(m -> m.group(1));
 
-			if (root.isPresent()) {
-				changeRoot(root.get());
-				return;
-			}
-
-			final Optional<String> path = Optional.of(cdPattern.matcher(cmd)).filter(Matcher::find).map(m->m.group(2).trim())
+		if (root.isPresent()) {
+			changeRoot(root.get());
+		} else {
+			final Optional<String> path = Optional.of(cdPattern.matcher(cmd)).filter(Matcher::find)
+					.map(m -> m.group(2).trim())
 					.map(m -> Paths.get(getDefaultFolder().toURI()).resolve(m).normalize().toString());
 
 			if (path.isPresent()) {
 				setDefaultFolder(path.get());
-				return;
+			} else {
+				try {
+					final Process p = new ProcessBuilder("cmd", "/c", cmd).directory(getDefaultFolder())
+							.redirectErrorStream(true).start();
+
+					try (final BufferedReader buffer = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+						buffer.lines().forEach(resultConsumer);
+					}
+
+					p.waitFor();
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
-
-			final Process p = new ProcessBuilder("cmd", "/c", cmd)
-					.directory(getDefaultFolder()).redirectErrorStream(true).start();
-
-			try (final BufferedReader buffer = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-				buffer.lines().forEach(resultConsumer);
-			}
-
-			p.waitFor();
-
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 	}
 }

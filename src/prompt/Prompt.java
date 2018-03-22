@@ -38,7 +38,7 @@ public class Prompt {
 			}
 
 			if (!exit) {
-				try (PrintWriter out = new PrintWriter("cmd_" + System.currentTimeMillis() + ".log", "UTF-8")) {
+				try (PrintWriter out = new PrintWriter("log\\cmd_" + System.currentTimeMillis() + ".log", "UTF-8")) {
 					run(System.in, out::println);
 				}
 			}
