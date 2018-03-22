@@ -1,5 +1,7 @@
 package prompt;
 
+import java.util.Optional;
+
 import javax.jms.Connection;
 
 import org.apache.activemq.broker.BrokerService;
@@ -16,9 +18,8 @@ public class RemoteCommandListener {
 
 			servivceBrokerHelper.waitFor(broker, p -> !p.isStarted());
 
-			final Connection connection = servivceBrokerHelper.createConnection();
-
-			connection.setExceptionListener(e -> System.err.println("JMS Exception occured. Shutting down client."));
+			final Connection connection = servivceBrokerHelper
+					.createConnection(e -> System.err.println("JMS Exception occured. Shutting down client."));
 
 			final LocalCommand command = new LocalCommand();
 
@@ -27,12 +28,11 @@ public class RemoteCommandListener {
 			servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.COMMAND, cmd -> {
 				command.execute(cmd);
 				servivceBrokerHelper.sendMessage(connection, command.getDefaultFolder().getAbsolutePath(),
-						ServiceBrokerHelper.RESULT, ServiceBrokerHelper.DEFAULT_FOLDER);
+						ServiceBrokerHelper.RESULT, Optional.of(ServiceBrokerHelper.DEFAULT_FOLDER));
 			});
 
-			servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.KILL, cmd -> {
-				kill(broker, connection);
-			});
+			servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.KILL,
+					c -> kill(broker, connection));
 
 		} catch (Exception e) {
 			e.printStackTrace();

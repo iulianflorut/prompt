@@ -20,7 +20,7 @@ public class Prompt {
 	public static void main(String[] args) throws Exception {
 
 		Optional<String> remote = Stream.of(args).filter(p -> p.equals(Environment.remote.name())).findFirst();
-		
+
 		if (remote.isPresent()) {
 			new RemoteCommandListener().start();
 		} else {
@@ -47,38 +47,31 @@ public class Prompt {
 
 	private static boolean run(InputStream is, Consumer<String> c)
 			throws IOException, Exception, FileNotFoundException, UnsupportedEncodingException {
+		
 		try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
 
-			Environment env = Environment.local;
-
 			do {
-				env.writePrompt();
+				Environment.writePrompt();
 
 				final String line = br.readLine();
 
-				if (!Optional.ofNullable(line).isPresent()) {
+				if (Optional.ofNullable(line).isPresent()) {
+
+					final String cmd = line.trim();
+
+					if (cmd.isEmpty()) {
+						continue;
+					}
+
+					c.accept(cmd);
+
+					if (Environment.exit(cmd)) {
+						return true;
+					}
+
+					Environment.execute(cmd);
+				} else
 					return false;
-				}
-
-				final String cmd = line.trim();
-
-				if (Optional.of(cmd).get().isEmpty()) {
-					continue;
-				}
-
-				c.accept(cmd);
-
-				if (Environment.exit(cmd)) {
-					return true;
-				}
-
-				 Optional<Environment> openv = Stream.of(Environment.values()).filter(p -> p.name().equals(cmd)).findFirst();
-				 if (openv.isPresent()) {
-					 env = Environment.get(openv.get());
-					 continue;
-				 }
-
-				env.execute(cmd);
 
 			} while (true);
 		}

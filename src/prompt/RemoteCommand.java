@@ -17,10 +17,9 @@ public class RemoteCommand extends BaseCommand {
 
 	public RemoteCommand() {
 		try {
-			connection = servivceBrokerHelper.createConnection();
-			connection.setExceptionListener(e -> {
+			connection = servivceBrokerHelper.createConnection(e -> {
 				synchronized (sync) {
-					sync.notifyAll();
+					sync.notify();
 				}
 				System.err.println("JMS Exception occured. Shutting down client.");
 			});
@@ -64,16 +63,14 @@ public class RemoteCommand extends BaseCommand {
 	}
 
 	private void receiveResult() throws JMSException {
-		servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.RESULT,
-				ServiceBrokerHelper.DEFAULT_FOLDER, (p, hasProperty) -> {
-					if (hasProperty) {
-						this.defaultFolder = new File(p);
-						synchronized (sync) {
-							sync.notifyAll();
-						}
-					} else {
-						resultConsumer.accept(p);
-					}
-				});
+		servivceBrokerHelper.consumerListener(connection, ServiceBrokerHelper.RESULT, resultConsumer,
+				PropertyConsumer.optional(ServiceBrokerHelper.DEFAULT_FOLDER, this::setDefaultFolder));
+	}
+
+	private void setDefaultFolder(String dir) {
+		this.defaultFolder = new File(dir);
+		synchronized (sync) {
+			sync.notify();
+		}
 	}
 }

@@ -10,6 +10,8 @@ public enum Environment {
 	private Commandable command;
 
 	private Class<? extends Commandable> clazz;
+	
+	private  static Environment env = local;
 
 	Environment(Class<? extends Commandable> clazz) {
 		this.clazz = clazz;
@@ -19,55 +21,65 @@ public enum Environment {
 		}
 	}
 
-	public void start() {
-		if (!isAlive()) {
+	public Environment start() {
+		if (!isStarted()) {
 			try {
 				this.command = clazz.newInstance();
 			} catch (Exception e) {
 				System.err.println("Cannot connect to the " + this.name() + " environment!");
 			}
 		}
+		return this;
 	}
 
 	private Commandable getCommand() {
 		return command;
 	}
 
-	public void execute(String cmd) {
-		Optional.ofNullable(this.getCommand()).filter(Commandable::isAlive).ifPresent(c -> c.execute(cmd));
+	public static void execute(String cmd) {
+		
+		Optional<Environment> openv = Stream.of(Environment.values()).filter(p -> p.name().equals(cmd))
+				.findFirst();
+		if (openv.isPresent()) {
+			env = Environment.get(openv.get());
+		} else { 
+			Optional.ofNullable(env.getCommand()).filter(Commandable::isAlive).ifPresent(c -> c.execute(cmd));
+		}
 	}
 
-	public boolean isAlive() {
+	private boolean isStarted() {
 		return command != null && command.isAlive();
 	}
 
-	public String shortName() {
+	private String shortName() {
 		return name().substring(0, 1).toUpperCase();
 	}
 
-	public void writePrompt() {
-		Optional.ofNullable(this.getCommand()).filter(Commandable::isAlive)
-				.ifPresent(c -> System.out.print(shortName() + " " + c.getDefaultFolder().getPath() + ">"));
+	public static void writePrompt() {
+		Optional.ofNullable(env.getCommand()).filter(Commandable::isAlive).map(Environment::getPrompt)
+				.ifPresent(System.out::print);
+	}
+	
+	private static String getPrompt(Commandable c) {
+		return String.format("%s %s>", env.shortName(), c.getDefaultFolder().getPath());
 	}
 
 	public static boolean exit(String cmd) {
 
 		switch (cmd) {
 		case ServiceBrokerHelper.EXIT:
-			Stream.of(Environment.values()).filter(e -> e.isAlive()).forEach(e -> e.getCommand().exit());
+			Stream.of(Environment.values()).filter(e -> e.isStarted()).forEach(e -> e.getCommand().exit());
 			return true;
 		case ServiceBrokerHelper.KILL:
-			Stream.of(Environment.values()).filter(e -> e.isAlive()).forEach(e -> e.getCommand().kill());
+			Stream.of(Environment.values()).filter(e -> e.isStarted()).forEach(e -> e.getCommand().kill());
 			return true;
 		default:
 			return false;
 		}
 	}
 
-	public static Environment get(Environment env) {
-		env.start();
-		return env.isAlive() ? env : local;
-
+	private static Environment get(Environment env) {
+		return env.start().isStarted() ? env : local;
 	}
 
 }
