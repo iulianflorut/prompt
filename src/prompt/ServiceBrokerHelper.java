@@ -34,14 +34,7 @@ public class ServiceBrokerHelper {
 	ServiceBrokerHelper() {
 		Properties p = new Properties();
 		try {
-			Optional.of((InputStream) new FileInputStream("cfg.properties")).ifPresent(t -> {
-				try {
-					p.load(t);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			});
-
+			Optional.of((InputStream) new FileInputStream("cfg.properties")).ifPresent(consumer(p::load));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -56,10 +49,10 @@ public class ServiceBrokerHelper {
 		return broker;
 	}
 
-	Connection createConnection(ExceptionListener listener) throws JMSException {
+	Connection createConnection(final ExceptionListener listener) throws JMSException {
 		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(ServiceBrokerHelper.TCP_BROKER_URL);
 
-		Connection connection = connectionFactory.createConnection();
+		final Connection connection = connectionFactory.createConnection();
 
 		connection.setExceptionListener(listener);
 
@@ -68,23 +61,23 @@ public class ServiceBrokerHelper {
 		return connection;
 	}
 
-	void consumerListener(Connection connection, String queue, Consumer<String> consumer) throws JMSException {
+	void consumerListener(final Connection connection, final String queue, final Consumer<String> consumer) throws JMSException {
 		consumerListener(connection, queue, consumer, Optional.empty());
 	}
 
-	void consumerListener(Connection connection, String queue, Consumer<String> consumer,
-			Optional<PropertyConsumer<String>> propertyConsumer) throws JMSException {
+	void consumerListener(final Connection connection, final String queue,final Consumer<String> consumer,
+			final Optional<PropertyConsumer<String>> propertyConsumer) throws JMSException {
 
-		Session session = createSession(connection);
+		final Session session = createSession(connection);
 
-		MessageConsumer mc = createMessageConsumer(session, queue);
+		final MessageConsumer mc = createMessageConsumer(session, queue);
 
 		mc.setMessageListener(message -> {
 			TextMessage textMessage = (TextMessage) message;
 			try {
 
-				if (propertyConsumer.isPresent() && Optional
-						.ofNullable(textMessage.getBooleanProperty(propertyConsumer.get().property)).orElse(false)) {
+				if (propertyConsumer.map(p -> p.property).filter(predicate(textMessage::propertyExists))
+						.filter(predicate(textMessage::getBooleanProperty)).isPresent()) {
 					propertyConsumer.get().consumer.accept(textMessage.getText());
 				} else {
 					consumer.accept(textMessage.getText());
@@ -95,9 +88,17 @@ public class ServiceBrokerHelper {
 		});
 	}
 
-	MessageConsumer createMessageConsumer(Session session, String queue) throws JMSException {
+	<T> Predicate<T> predicate(final ThrowablePredicate<T> p) {
+		return i -> p.test(i);
+	}
 
-		Queue target = session.createQueue(queue);
+	<T> Consumer<T> consumer(final ThrowableConsumer<T> p) {
+		return i -> p.accept(i);
+	}
+
+	MessageConsumer createMessageConsumer(final Session session, final String queue) throws JMSException {
+
+		final Queue target = session.createQueue(queue);
 
 		return session.createConsumer(target);
 	}
@@ -108,23 +109,16 @@ public class ServiceBrokerHelper {
 		}
 	}
 
-	void sendMessage(Connection connection, String message, String queue, Optional<String> property) {
+	void sendMessage(final Connection connection, final String message, final String queue, final Optional<String> property) {
 		try {
-			Session session = createSession(connection);
-			MessageProducer producer;
-			Queue destination = session.createQueue(queue);
-			producer = session.createProducer(destination);
+			final Session session = createSession(connection);
+			final Queue destination = session.createQueue(queue);
+			final MessageProducer producer = session.createProducer(destination);
 			producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
-			TextMessage textMessage = session.createTextMessage(message);
+			final TextMessage textMessage = session.createTextMessage(message);
 
-			property.ifPresent(p -> {
-				try {
-					textMessage.setBooleanProperty(p, true);
-				} catch (JMSException e) {
-					e.printStackTrace();
-				}
-			});
+			property.ifPresent(consumer(p -> textMessage.setBooleanProperty(p, true)));
 
 			producer.send(textMessage);
 
@@ -134,11 +128,11 @@ public class ServiceBrokerHelper {
 		}
 	}
 
-	void sendMessage(Connection connection, String message, String queue) {
+	void sendMessage(final Connection connection, final String message, final String queue) {
 		sendMessage(connection, message, queue, Optional.empty());
 	}
 
-	Session createSession(Connection connection) throws JMSException {
+	Session createSession(final Connection connection) throws JMSException {
 		return connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
 	}
 }
