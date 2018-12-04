@@ -30,7 +30,7 @@ public class LocalCommand extends BaseCommand {
 	}
 
 	private void changeRoot(final String root) {
-		File file = new File(root);
+		var file = new File(root);
 		if (file.exists()) {
 			this.root = getFileRoot(file);
 			if (!paths.containsKey(this.root)) {
@@ -46,12 +46,9 @@ public class LocalCommand extends BaseCommand {
 	}
 
 	private void setDefaultFolder(final String path) {
-		File file = new File(path);
-		if (file.exists()) {
-			setDefaultFolder(file);
-		} else {
+		Optional.ofNullable(new File(path)).filter(File::exists).ifPresentOrElse(this::setDefaultFolder, () -> {
 			System.err.println("The system cannot find the path specified.");
-		}
+		});
 	}
 
 	private void setDefaultFolder(final File file) {
@@ -64,31 +61,28 @@ public class LocalCommand extends BaseCommand {
 		if (!Optional.ofNullable(cmd).isPresent() || cmd.isEmpty())
 			return;
 
-		final Optional<String> root = Optional.of(rootPattern.matcher(cmd)).filter(Matcher::find).map(m -> m.group(1));
+		final var root = Optional.of(rootPattern.matcher(cmd)).filter(Matcher::find).map(m -> m.group(1));
 
 		if (root.isPresent()) {
 			changeRoot(root.get());
 		} else {
-			final Optional<String> path = Optional.of(cdPattern.matcher(cmd)).filter(Matcher::find)
-					.map(m -> m.group(2).trim())
-					.map(m -> Paths.get(getDefaultFolder().toURI()).resolve(m).normalize().toString());
+			Optional.of(cdPattern.matcher(cmd)).filter(Matcher::find).map(m -> m.group(2).trim())
+					.map(m -> Paths.get(getDefaultFolder().toURI()).resolve(m).normalize().toString())
+					.ifPresentOrElse(this::setDefaultFolder, () -> {
+						try {
+							final var p = new ProcessBuilder("cmd", "/c", cmd).directory(getDefaultFolder())
+									.redirectErrorStream(true).start();
 
-			if (path.isPresent()) {
-				setDefaultFolder(path.get());
-			} else {
-				try {
-					final Process p = new ProcessBuilder("cmd", "/c", cmd).directory(getDefaultFolder())
-							.redirectErrorStream(true).start();
+							try (final BufferedReader buffer = new BufferedReader(
+									new InputStreamReader(p.getInputStream()))) {
+								buffer.lines().forEach(resultConsumer);
+							}
 
-					try (final BufferedReader buffer = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-						buffer.lines().forEach(resultConsumer);
-					}
-
-					p.waitFor();
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
+							p.waitFor();
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+					});
 		}
 	}
 }

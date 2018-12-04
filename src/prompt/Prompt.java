@@ -12,7 +12,6 @@ import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -28,14 +27,14 @@ public class Prompt {
 
 	public static void main(String[] args) throws Exception {
 
-		Optional<String> remote = Stream.of(args).filter(p -> p.equals(Environment.remote.name())).findFirst();
+		var remote = Stream.of(args).filter(p -> p.equals(Environment.remote.name())).findFirst();
 
 		if (remote.isPresent()) {
 			new RemoteCommandListener().start();
 		} else {
-			boolean exit = false;
+			var exit = false;
 
-			Optional<File> file = Stream.of(args).filter(p -> p.startsWith(Prompt.FILE))
+			var file = Stream.of(args).filter(p -> p.startsWith(Prompt.FILE))
 					.map(p -> p.substring(Prompt.FILE.length())).map(File::new).findFirst();
 			
 			arguments = Stream.of(args).filter(p -> !p.startsWith(Prompt.FILE)).collect(Collectors.toList());
@@ -59,19 +58,18 @@ public class Prompt {
 	private static boolean run(InputStream is, Consumer<String> c)
 			throws IOException, Exception, FileNotFoundException, UnsupportedEncodingException {
 		
-		try (BufferedReader br = new BufferedReader(new InputStreamReader(is))) {
+		try (var br = new BufferedReader(new InputStreamReader(is))) {
 
 			do {
 				Environment.writePrompt();
 
-				final String line = br.readLine();
+				final var line = br.readLine();
 
 				if (Optional.ofNullable(line).isPresent()) {
 
-					String cmd = line.trim();
+					var cmd = line.trim();
 					
-					
-					Matcher m = argPattern.matcher(cmd);
+					var m = argPattern.matcher(cmd);
 					
 					while (m.find()) {
 						int index = Integer.valueOf(m.group().substring(1));

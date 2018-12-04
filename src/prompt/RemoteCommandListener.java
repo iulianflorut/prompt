@@ -14,14 +14,14 @@ public class RemoteCommandListener {
 
 		try {
 			// configure the broker
-			final BrokerService broker = servivceBrokerHelper.createBroker();
+			final var broker = servivceBrokerHelper.createBroker();
 
 			servivceBrokerHelper.waitFor(broker, p -> !p.isStarted());
 
-			final Connection connection = servivceBrokerHelper
+			final var connection = servivceBrokerHelper
 					.createConnection(e -> System.err.println("JMS Exception occured. Shutting down client."));
 
-			final LocalCommand command = new LocalCommand();
+			final var command = new LocalCommand();
 
 			command.setResultConsumer(p -> servivceBrokerHelper.sendMessage(connection, p, ServiceBrokerHelper.RESULT));
 

@@ -16,7 +16,7 @@ public enum Environment {
 	Environment(Class<? extends Commandable> clazz) {
 		this.clazz = clazz;
 		try {
-			this.command = clazz.newInstance();
+			this.command = clazz.getConstructor().newInstance();
 		} catch (Exception e) {
 		}
 	}
@@ -24,7 +24,7 @@ public enum Environment {
 	public Environment start() {
 		if (!isStarted()) {
 			try {
-				this.command = clazz.newInstance();
+				this.command = clazz.getConstructor().newInstance();
 			} catch (Exception e) {
 				System.err.println("Cannot connect to the " + this.name() + " environment!");
 			}
@@ -38,7 +38,7 @@ public enum Environment {
 
 	public static void execute(String cmd) {
 		
-		Optional<Environment> openv = Stream.of(Environment.values()).filter(p -> p.name().equals(cmd))
+		var openv = Stream.of(Environment.values()).filter(p -> p.name().equals(cmd))
 				.findFirst();
 		if (openv.isPresent()) {
 			env = Environment.get(openv.get());

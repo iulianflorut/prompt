@@ -13,8 +13,6 @@ import javax.jms.DeliveryMode;
 import javax.jms.ExceptionListener;
 import javax.jms.JMSException;
 import javax.jms.MessageConsumer;
-import javax.jms.MessageProducer;
-import javax.jms.Queue;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 
@@ -32,7 +30,7 @@ public class ServiceBrokerHelper {
 	static String TCP_BROKER_URL;
 
 	ServiceBrokerHelper() {
-		Properties p = new Properties();
+		var p = new Properties();
 		try {
 			Optional.of((InputStream) new FileInputStream("cfg.properties")).ifPresent(consumer(p::load));
 		} catch (IOException e) {
@@ -42,7 +40,7 @@ public class ServiceBrokerHelper {
 	}
 
 	BrokerService createBroker() throws IOException, Exception {
-		BrokerService broker = new BrokerService();
+		var broker = new BrokerService();
 		broker.setPersistenceAdapter(new MemoryPersistenceAdapter());
 		broker.addConnector(ServiceBrokerHelper.TCP_BROKER_URL);
 		broker.start();
@@ -50,9 +48,9 @@ public class ServiceBrokerHelper {
 	}
 
 	Connection createConnection(final ExceptionListener listener) throws JMSException {
-		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(ServiceBrokerHelper.TCP_BROKER_URL);
+		var connectionFactory = new ActiveMQConnectionFactory(ServiceBrokerHelper.TCP_BROKER_URL);
 
-		final Connection connection = connectionFactory.createConnection();
+		final var connection = connectionFactory.createConnection();
 
 		connection.setExceptionListener(listener);
 
@@ -68,9 +66,9 @@ public class ServiceBrokerHelper {
 	void consumerListener(final Connection connection, final String queue,final Consumer<String> consumer,
 			final Optional<PropertyConsumer<String>> propertyConsumer) throws JMSException {
 
-		final Session session = createSession(connection);
+		final var session = createSession(connection);
 
-		final MessageConsumer mc = createMessageConsumer(session, queue);
+		final var mc = createMessageConsumer(session, queue);
 
 		mc.setMessageListener(message -> {
 			TextMessage textMessage = (TextMessage) message;
@@ -98,7 +96,7 @@ public class ServiceBrokerHelper {
 
 	MessageConsumer createMessageConsumer(final Session session, final String queue) throws JMSException {
 
-		final Queue target = session.createQueue(queue);
+		final var target = session.createQueue(queue);
 
 		return session.createConsumer(target);
 	}
@@ -111,12 +109,12 @@ public class ServiceBrokerHelper {
 
 	void sendMessage(final Connection connection, final String message, final String queue, final Optional<String> property) {
 		try {
-			final Session session = createSession(connection);
-			final Queue destination = session.createQueue(queue);
-			final MessageProducer producer = session.createProducer(destination);
+			final var session = createSession(connection);
+			final var destination = session.createQueue(queue);
+			final var producer = session.createProducer(destination);
 			producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
-			final TextMessage textMessage = session.createTextMessage(message);
+			final var textMessage = session.createTextMessage(message);
 
 			property.ifPresent(consumer(p -> textMessage.setBooleanProperty(p, true)));
 
