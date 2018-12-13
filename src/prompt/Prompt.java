@@ -4,11 +4,9 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -40,7 +38,7 @@ public class Prompt {
 			arguments = Stream.of(args).filter(p -> !p.startsWith(Prompt.FILE)).collect(Collectors.toList());
 
 			if (file.isPresent()) {
-				try (InputStream is = new FileInputStream(file.get())) {
+				try (var is = new FileInputStream(file.get())) {
 					exit = run(is, System.out::println);
 				} catch (FileNotFoundException e) {
 					System.err.println(e.getMessage());
@@ -48,7 +46,7 @@ public class Prompt {
 			}
 
 			if (!exit) {
-				try (PrintWriter out = new PrintWriter("log\\cmd_" + System.currentTimeMillis() + ".log", "UTF-8")) {
+				try (var out = new PrintWriter("log\\cmd_" + System.currentTimeMillis() + ".log", "UTF-8")) {
 					run(System.in, out::println);
 				}
 			}
@@ -56,7 +54,7 @@ public class Prompt {
 	}
 
 	private static boolean run(InputStream is, Consumer<String> c)
-			throws IOException, Exception, FileNotFoundException, UnsupportedEncodingException {
+			throws Exception {
 		
 		try (var br = new BufferedReader(new InputStreamReader(is))) {
 
@@ -72,7 +70,7 @@ public class Prompt {
 					var m = argPattern.matcher(cmd);
 					
 					while (m.find()) {
-						int index = Integer.valueOf(m.group().substring(1));
+						var index = Integer.valueOf(m.group().substring(1));
 						
 						if (arguments.size() >= index) {
 							cmd = cmd.replace(m.group(), arguments.get(index-1));
